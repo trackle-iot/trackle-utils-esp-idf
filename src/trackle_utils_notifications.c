@@ -1,7 +1,6 @@
 #include <trackle_utils_notifications.h>
 
 #include <string.h>
-#include <inttypes.h>
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -36,6 +35,8 @@ typedef struct
     uint16_t scale;                          // Scale factor (divides new value when set)
     uint8_t numDecimals;                     // Number of decimal digits (only used if scale is set)
     uint8_t level;
+    const char **valueMap; // Optional array of strings to map value to string
+    uint8_t valueMapSize;  // Size of valueMap array (0 if not used)
 } Notification_t;
 
 static Notification_t notifications[TRACKLE_MAX_NOTIFICATIONS_NUM] = {0}; // Array holding the notifications created by the user.
@@ -46,15 +47,42 @@ static bool makeMessageStringFromNotification(char *messageBuffer, int notificat
     static char valueBuffer[32];
     messageBuffer[0] = '\0';
     valueBuffer[0] = '\0';
-    if (notifications[notificationIndex].scale == 1)
-    { // integer
-        if (notifications[notificationIndex].sign)
-        { // uint, remove sign
-            sprintf(valueBuffer, "%" PRIi32, notifications[notificationIndex].value);
+
+    // Check if valueMap is available and value is a valid index
+    if (notifications[notificationIndex].valueMap != NULL &&
+        notifications[notificationIndex].valueMapSize > 0 &&
+        notifications[notificationIndex].value >= 0 &&
+        notifications[notificationIndex].value < notifications[notificationIndex].valueMapSize)
+    {
+        // Use mapped string value
+        const char *mappedString = notifications[notificationIndex].valueMap[notifications[notificationIndex].value];
+        if (mappedString != NULL)
+        {
+            // Add quotes around the string value
+            snprintf(valueBuffer, sizeof(valueBuffer), "\"%s\"", mappedString);
         }
         else
         {
-            sprintf(valueBuffer, "%" PRIu32, (uint32_t)notifications[notificationIndex].value);
+            // Fallback to numeric value if mapped string is NULL
+            if (notifications[notificationIndex].sign)
+            {
+                sprintf(valueBuffer, "%d", notifications[notificationIndex].value);
+            }
+            else
+            {
+                sprintf(valueBuffer, "%u", notifications[notificationIndex].value);
+            }
+        }
+    }
+    else if (notifications[notificationIndex].scale == 1)
+    { // integer
+        if (notifications[notificationIndex].sign)
+        { // signed int
+            sprintf(valueBuffer, "%d", notifications[notificationIndex].value);
+        }
+        else
+        { // unsigned int
+            sprintf(valueBuffer, "%u", notifications[notificationIndex].value);
         }
     }
     else
@@ -127,6 +155,11 @@ bool Trackle_Notifications_startTask()
 
 Trackle_NotificationID_t Trackle_Notification_create(const char *name, const char *eventName, const char *format, uint16_t scale, uint8_t numDecimals, bool sign)
 {
+    return Trackle_Notification_createWithValueMap(name, eventName, format, scale, numDecimals, sign, NULL, 0);
+}
+
+Trackle_NotificationID_t Trackle_Notification_createWithValueMap(const char *name, const char *eventName, const char *format, uint16_t scale, uint8_t numDecimals, bool sign, const char **valueMap, uint8_t valueMapSize)
+{
     if (numNotificationsCreated < TRACKLE_MAX_NOTIFICATIONS_NUM)
     {
         const int newNotificationIndex = numNotificationsCreated;
@@ -167,6 +200,8 @@ Trackle_NotificationID_t Trackle_Notification_create(const char *name, const cha
         notifications[newNotificationIndex].numDecimals = numDecimals;
         notifications[newNotificationIndex].changed = false;
         notifications[newNotificationIndex].level = 0;
+        notifications[newNotificationIndex].valueMap = valueMap;
+        notifications[newNotificationIndex].valueMapSize = valueMapSize;
         numNotificationsCreated++;
         return newNotificationIndex + 1; // Convert internal notification index to notification ID by incrementing it.
     }

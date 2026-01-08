@@ -61,6 +61,20 @@ typedef int Trackle_NotificationID_t;
 Trackle_NotificationID_t Trackle_Notification_create(const char *name, const char *eventName, const char *format, uint16_t scale, uint8_t numDecimals, bool sign);
 
 /**
+ * @brief Create a new notification with value mapping to strings.
+ * @param name Name/key to be assigned to the notification.
+ * @param eventName Name of the event where to publish the notification (e.g. "machine/speed")
+ * @param format Printf style format for the message. It must contain, in order: %s for the notification key, %u for the level, and %s for the value.
+ * @param scale Divider to be applied to values used to update the notification (notificationValue = newValue / scale)
+ * @param numDecimals Number of decimal digits to be used when publishing the notification value to the cloud. It's used only if \ref scale differs from 1 (otherwise the notification's value is an integer and it doesn't make sense).
+ * @param sign If true, the notification's value is signed, otherwise it's unsigned. It's used only if \ref scale equals 1 (otherwise the notification's value is a floating point number and is signed by default).
+ * @param valueMap Optional array of strings to map numeric values to strings. If provided and value is a valid index, the string will be used instead of the numeric value.
+ * @param valueMapSize Size of the valueMap array. Set to 0 if valueMap is not used.
+ * @return ID associated with the new created notification, or \ref Trackle_NotificationID_ERROR on failure.
+ */
+Trackle_NotificationID_t Trackle_Notification_createWithValueMap(const char *name, const char *eventName, const char *format, uint16_t scale, uint8_t numDecimals, bool sign, const char **valueMap, uint8_t valueMapSize);
+
+/**
  * @brief Update the value of an notification.
  * @param notificationID ID of the notification to be updated.
  * @param newLevel Unsigned integer representing the level of the notification.
